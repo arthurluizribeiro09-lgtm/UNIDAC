@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unidac — Roteiro de Testes</title>
+  <link rel="stylesheet" href="css/unidac-alert.css" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --ok: #22c55e;
+      --fail: #ef4444;
+      --warn: #f59e0b;
+      --accent: #159447;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    h2 { font-size: 1.1rem; margin: 0 0 12px; color: #bbf7d0; }
+    p.lead { color: var(--muted); margin: 0 0 20px; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;
+      align-items: center;
+    }
+    button, .btn {
+      border: 0; border-radius: 10px; padding: 10px 14px;
+      background: var(--accent); color: #fff; font-weight: 700;
+      cursor: pointer; font: inherit;
+    }
+    button.secondary { background: #334155; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 900px) {
+      .grid.two { grid-template-columns: 1fr 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .status.ok { color: var(--ok); }
+    .status.fail { color: var(--fail); }
+    .status.warn { color: var(--warn); }
+    .status.skip { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 700; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+    code { background: #0f172a; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+    .check-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .check-row:last-child { border-bottom: 0; }
+    .check-row label { flex: 1; cursor: pointer; }
+    .check-row input { margin-top: 3px; width: 18px; height: 18px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    #autoResults { max-height: 420px; overflow: auto; }
+    #summary { font-weight: 800; margin-bottom: 10px; }
+    a { color: #86efac; }
+    .role-tag {
+      display: inline-block; background: #064e3b; color: #bbf7d0;
+      border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700;
+      margin-right: 4px;
+    }
+  </style>
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <h1>Roteiro de testes — Unidac Industries</h1>
+  <p class="lead">
+    Use esta página para validar login, menu por cargo, Firebase e botões principais.
+    Os testes automáticos checam o ambiente; os manuais confirmam o comportamento real em cada cargo.
+  </p>
+
+  <div class="toolbar">
+    <button type="button" id="btnRunAuto">Rodar testes automáticos</button>
+    <button type="button" class="secondary" id="btnClearManual">Limpar checklist manual</button>
+    <button type="button" class="secondary" id="btnExport">Exportar resultado (.txt)</button>
+    <a class="btn secondary" href="index.html" style="text-decoration:none">Ir ao login</a>
+  </div>
+
+  <div class="grid two">
+    <section class="card">
+      <h2>1. Testes automáticos</h2>
+      <div id="summary" class="muted">Clique em “Rodar testes automáticos”.</div>
+      <div id="autoResults"></div>
+    </section>
+
+    <section class="card">
+      <h2>2. Sessão atual</h2>
+      <div id="sessionBox" class="muted">Carregando…</div>
+      <p class="muted" style="margin-top:12px">
+        Dica: faça login em outra aba, volte aqui e rode os automáticos de novo.
+      </p>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>3. Checklist manual por cargo</h2>
+    <p class="muted">Marque cada item após testar de verdade no site (login com aquele cargo).</p>
+    <div id="manualBox"></div>
+  </section>
+
+  <section class="card" style="margin-top:16px">
+    <h2>4. Matriz de abas (ROLE_PAGES)</h2>
+    <div id="matrixBox" class="muted">Carregue os scripts do app para ver a matriz.</div>
+  </section>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/unidac-alert.js"></script>
+  <script>
+(function () {
+  var STORAGE_KEY = "unidacTestChecklist_v1";
+
+  var MANUAL = [
+    {
+      role: "administrador",
+      items: [
+        "Login com admin funciona e abre dashboard",
+        "Usuários: criar / editar / excluir grava no Firebase",
+        "Financeiro: nova movimentação aparece na lista",
+        "Estoque: novo produto e movimentar gravam",
+        "Desperdício: registrar ocorrência grava",
+        "Compras: novo pedido grava",
+        "Validades: adicionar produto grava",
+        "Metas: novo desafio grava e lista atualiza",
+        "Cozinha: confirmar produção grava",
+        "Relatórios: PDF gera sem erro",
+        "Logout volta para index e limpa sessão"
+      ]
+    },
+    {
+      role: "estoquista",
+      items: [
+        "Login abre dashboard (ou home do cargo)",
+        "Menu só mostra abas do estoquista (+ Metas)",
+        "Não aparece Usuários / Financeiro / Inteligente",
+        "Estoque: novo produto grava",
+        "Estoque: movimentar (entrada/saída) grava",
+        "Estoque: histórico lista movimentações",
+        "Compras: novo pedido grava",
+        "Validades: adicionar produto grava",
+        "Metas: novo desafio grava",
+        "URL proibida (ex: usuarios.html) redireciona"
+      ]
+    },
+    {
+      role: "cozinheira",
+      items: [
+        "Menu coerente (cozinha, consumo, estoque, compras, desperdício, validades, metas, cardápio, notificações)",
+        "Cozinha: confirmar produção grava e lista “produções confirmadas”",
+        "Desperdício: registrar ocorrência grava",
+        "Compras: novo pedido grava",
+        "Não acessa Usuários nem Financeiro"
+      ]
+    },
+    {
+      role: "financeiro",
+      items: [
+        "Menu: dashboard, financeiro, compras, relatórios, metas, notificações",
+        "Nova movimentação grava e atualiza totais",
+        "Compras: consegue ver/criar pedido",
+        "Não acessa estoque/usuários (se bloqueado no ROLE_PAGES)"
+      ]
+    },
+    {
+      role: "gerente",
+      items: [
+        "Menu amplo (sem usuários/inteligente se assim configurado)",
+        "Consegue lançar meta e ver estoque/compras",
+        "Relatórios PDF ok"
+      ]
+    },
+    {
+      role: "aluno",
+      items: [
+        "Home = cardápio",
+        "Menu só: Cardápio, Ficha, Metas, Notificações",
+        "Metas: novo desafio grava",
+        "Não vê abas de administrador em nenhuma tela"
+      ]
+    },
+    {
+      role: "professor",
+      items: [
+        "Menu: Cardápio, Metas, Notificações (sem Desperdício)",
+        "Metas funciona",
+        "Não abre desperdicio.html"
+      ]
+    },
+    {
+      role: "funcionario",
+      items: [
+        "Menu: Cardápio, Metas, Notificações",
+        "Metas funciona",
+        "Sem abas operacionais de estoque"
+      ]
+    },
+    {
+      role: "geral",
+      items: [
+        "Rules publicadas no Firebase (passo 1)",
+        "Após Rules: sair e entrar de novo em cada usuário",
+        "Senha errada mostra alerta central",
+        "Recuperar senha envia e-mail (se configurado)",
+        "Site no celular: login e menu usáveis",
+        "GitHub Pages: sem loop de atualização infinita"
+      ]
+    }
+  ];
+
+  function el(id) { return document.getElementById(id); }
+
+  function loadManualState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveManualState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function renderSession() {
+    var box = el("sessionBox");
+    var u = null;
+    try {
+      u = typeof getSession === "function" ? getSession() : JSON.parse(localStorage.getItem("unidacUser") || "null");
+    } catch (e) {}
+    if (!u || !u.role) {
+      box.innerHTML = "<p><span class=\"status warn\">● Sem sessão</span> — faça login em <a href=\"index.html\">index.html</a>.</p>";
+      return;
+    }
+    var pages = (typeof pagesForRole === "function") ? pagesForRole(u.role) : [];
+    box.innerHTML =
+      "<p><span class=\"status ok\">● Logado</span></p>" +
+      "<p><strong>Nome:</strong> " + (u.name || "—") + "<br>" +
+      "<strong>E-mail:</strong> " + (u.email || "—") + "<br>" +
+      "<strong>Cargo:</strong> <span class=\"role-tag\">" + u.role + "</span><br>" +
+      "<strong>UID:</strong> <code>" + (u.uid || u.id || "—") + "</code></p>" +
+      "<p class=\"muted\"><strong>Abas liberadas:</strong> " + (pages.join(", ") || "—") + "</p>";
+  }
+
+  function renderMatrix() {
+    var box = el("matrixBox");
+    if (typeof ROLE_PAGES === "undefined") {
+      box.textContent = "ROLE_PAGES não encontrado (js/app.js).";
+      return;
+    }
+    var roles = Object.keys(ROLE_PAGES);
+    var html = "<table><thead><tr><th>Cargo</th><th>Páginas</th><th>Home</th></tr></thead><tbody>";
+    roles.forEach(function (r) {
+      var home = (typeof ROLE_HOME !== "undefined" && ROLE_HOME[r]) ? ROLE_HOME[r] : "—";
+      html += "<tr><td><span class=\"role-tag\">" + r + "</span></td><td>" +
+        ROLE_PAGES[r].map(function (p) { return "<code>" + p + "</code>"; }).join(" ") +
+        "</td><td><code>" + home + "</code></td></tr>";
+    });
+    html += "</tbody></table>";
+    box.innerHTML = html;
+  }
+
+  function renderManual() {
+    var state = loadManualState();
+    var box = el("manualBox");
+    var html = "";
+    MANUAL.forEach(function (block, bi) {
+      html += "<div style=\"margin-bottom:18px\"><h3 style=\"margin:0 0 8px;font-size:14px\">" +
+        "<span class=\"role-tag\">" + block.role + "</span></h3>";
+      block.items.forEach(function (item, ii) {
+        var key = block.role + "::" + ii;
+        var checked = state[key] ? "checked" : "";
+        html += "<div class=\"check-row\">" +
+          "<input type=\"checkbox\" id=\"c_" + bi + "_" + ii + "\" data-key=\"" + key + "\" " + checked + " />" +
+          "<label for=\"c_" + bi + "_" + ii + "\">" + item + "</label></div>";
+      });
+      html += "</div>";
+    });
+    box.innerHTML = html;
+    box.querySelectorAll("input[type=checkbox]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var st = loadManualState();
+        st[input.getAttribute("data-key")] = input.checked;
+        saveManualState(st);
+      });
+    });
+  }
+
+  function row(status, name, detail) {
+    var cls = status;
+    var icon = status === "ok" ? "OK" : status === "fail" ? "FALHOU" : status === "warn" ? "AVISO" : "—";
+    return (
+      "<tr><td><span class=\"status " + cls + "\">" + icon + "</span></td>" +
+      "<td>" + name + "</td><td class=\"muted\">" + (detail || "") + "</td></tr>"
+    );
+  }
+
+  async function runAuto() {
+    var results = [];
+    function add(status, name, detail) { results.push({ status: status, name: name, detail: detail || "" }); }
+
+    // Scripts / funções
+    add(typeof firebase !== "undefined" ? "ok" : "fail", "Firebase SDK carregado", typeof firebase);
+    add(typeof firebaseConfig !== "undefined" || (typeof firebase !== "undefined") ? "ok" : "warn", "Config Firebase", "firebase-config.js");
+    add(typeof getSession === "function" ? "ok" : "fail", "getSession()", "");
+    add(typeof pagesForRole === "function" ? "ok" : "fail", "pagesForRole() — menu por cargo", "");
+    add(typeof homeForRole === "function" ? "ok" : "fail", "homeForRole()", "");
+    add(typeof ROLE_PAGES === "object" ? "ok" : "fail", "ROLE_PAGES definido", "");
+    add(typeof addDocument === "function" ? "ok" : "fail", "addDocument() Firestore", "");
+    add(typeof listenCollection === "function" ? "ok" : "warn", "listenCollection() tempo real", "");
+    add(typeof createAuthUser === "function" ? "ok" : "warn", "createAuthUser()", "");
+    add(typeof showUnidacAlert === "function" ? "ok" : "warn", "showUnidacAlert() alertas", "");
+
+    // ROLE_PAGES sanity
+    if (typeof ROLE_PAGES === "object") {
+      var roles = ["administrador","gerente","estoquista","cozinheira","financeiro","aluno","professor","funcionario"];
+      roles.forEach(function (r) {
+        var pages = ROLE_PAGES[r];
+        if (!pages) add("fail", "ROLE_PAGES." + r, "ausente");
+        else {
+          var hasMetas = pages.indexOf("metas.html") !== -1;
+          add(hasMetas ? "ok" : "fail", "Metas liberada para " + r, hasMetas ? "metas.html" : "faltando");
+        }
+      });
+      var prof = ROLE_PAGES.professor || [];
+      add(prof.indexOf("desperdicio.html") === -1 ? "ok" : "fail", "Professor sem desperdício", prof.join(", "));
+      var aluno = ROLE_PAGES.aluno || [];
+      var alunoOk = ["cardapio.html","ficha.html","metas.html","notificacoes.html"].every(function (p) { return aluno.indexOf(p) !== -1; });
+      add(alunoOk ? "ok" : "warn", "Aluno com abas mínimas", aluno.join(", "));
+    }
+
+    // Sessão
+    var u = null;
+    try { u = typeof getSession === "function" ? getSession() : null; } catch (e) {}
+    if (!u) {
+      try { u = JSON.parse(localStorage.getItem("unidacUser") || "null"); } catch (e) {}
+    }
+    if (!u || !u.role) {
+      add("warn", "Sessão ativa", "Ninguém logado — testes de permissão Firestore limitados");
+    } else {
+      add("ok", "Sessão ativa", u.role + " / " + (u.email || ""));
+      if (u.uid || u.id) add("ok", "UID/perfil", u.uid || u.id);
+      else add("warn", "UID/perfil", "Sem uid — Rules por cargo podem falhar até novo login");
+    }
+
+    // Firebase Auth + leitura users (se logado)
+    if (typeof auth !== "undefined" && auth.currentUser) {
+      add("ok", "Auth currentUser", auth.currentUser.email || auth.currentUser.uid);
+    } else if (u && u.role) {
+      add("warn", "Auth currentUser", "Sessão local sem auth.currentUser — faça login de novo");
+    }
+
+    if (typeof db !== "undefined" && u && u.role) {
+      try {
+        var snap = await db.collection("users").limit(1).get();
+        add("ok", "Firestore leitura users", snap.size + " doc(s) na amostra");
+      } catch (err) {
+        add("fail", "Firestore leitura users", (err && err.message) || String(err));
+      }
+      // tentativa de leitura por coleção operacional
+      var cols = ["stock", "goals", "purchases", "financial_movements", "waste"];
+      for (var i = 0; i < cols.length; i++) {
+        try {
+          await db.collection(cols[i]).limit(1).get();
+          add("ok", "Leitura " + cols[i], "permitida para este cargo");
+        } catch (err) {
+          var msg = (err && err.message) || String(err);
+          if (/permission|Missing or insufficient/i.test(msg)) {
+            add("warn", "Leitura " + cols[i], "bloqueada pelas Rules (pode ser esperado)");
+          } else {
+            add("fail", "Leitura " + cols[i], msg);
+          }
+        }
+      }
+    } else {
+      add("skip", "Prova de leitura Firestore", "Requer login + db");
+    }
+
+    // Páginas HTML essenciais
+    var pagesNeed = ["index.html","dashboard.html","estoque.html","compras.html","metas.html","js/app.js","js/firebase-actions.js","firestore.rules"];
+    // fetch only works on http(s)
+    if (location.protocol === "http:" || location.protocol === "https:") {
+      for (var j = 0; j < pagesNeed.length; j++) {
+        try {
+          var res = await fetch(pagesNeed[j], { method: "HEAD" });
+          add(res.ok ? "ok" : "fail", "Arquivo " + pagesNeed[j], res.status);
+        } catch (e) {
+          add("warn", "Arquivo " + pagesNeed[j], "não verificado");
+        }
+      }
+    } else {
+      add("skip", "Verificação de arquivos via fetch", "Abra pelo GitHub Pages ou servidor local");
+    }
+
+    // Render
+    var ok = results.filter(function (r) { return r.status === "ok"; }).length;
+    var fail = results.filter(function (r) { return r.status === "fail"; }).length;
+    var warn = results.filter(function (r) { return r.status === "warn"; }).length;
+    el("summary").innerHTML =
+      "<span class=\"status ok\">" + ok + " ok</span> · " +
+      "<span class=\"status fail\">" + fail + " falha(s)</span> · " +
+      "<span class=\"status warn\">" + warn + " aviso(s)</span>";
+
+    var html = "<table><thead><tr><th>Status</th><th>Teste</th><th>Detalhe</th></tr></thead><tbody>";
+    results.forEach(function (r) { html += row(r.status, r.name, r.detail); });
+    html += "</tbody></table>";
+    el("autoResults").innerHTML = html;
+
+    window.__lastAutoResults = results;
+    renderSession();
+  }
+
+  function exportAll() {
+    var lines = [];
+    lines.push("Unidac Industries — Resultado de testes");
+    lines.push("Data: " + new Date().toISOString());
+    lines.push("");
+    lines.push("=== AUTOMÁTICOS ===");
+    (window.__lastAutoResults || []).forEach(function (r) {
+      lines.push("[" + r.status.toUpperCase() + "] " + r.name + (r.detail ? " — " + r.detail : ""));
+    });
+    lines.push("");
+    lines.push("=== MANUAL ===");
+    var st = loadManualState();
+    MANUAL.forEach(function (block) {
+      lines.push("\n#" + block.role);
+      block.items.forEach(function (item, ii) {
+        var key = block.role + "::" + ii;
+        lines.push((st[key] ? "[x] " : "[ ] ") + item);
+      });
+    });
+    var blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "unidac-testes-" + new Date().toISOString().slice(0, 10) + ".txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  el("btnRunAuto").addEventListener("click", function () {
+    el("summary").textContent = "Rodando…";
+    runAuto().catch(function (e) {
+      el("summary").textContent = "Erro ao rodar testes: " + e;
+    });
+  });
+  el("btnClearManual").addEventListener("click", function () {
+    if (!confirm("Limpar todas as marcas do checklist manual?")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    renderManual();
+  });
+  el("btnExport").addEventListener("click", exportAll);
+
+  renderSession();
+  renderManual();
+  renderMatrix();
+})();
+  </script>
+</body>
+</html>

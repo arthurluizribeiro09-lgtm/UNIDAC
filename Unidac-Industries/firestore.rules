@@ -1,0 +1,168 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* =========================================================
+       Unidac Industries — Rules por cargo
+       O perfil em users/{uid} (uid = Firebase Auth) define o role.
+       ========================================================= */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userExists() {
+      return signedIn() && exists(userPath());
+    }
+
+    function userRole() {
+      return userExists()
+        ? get(userPath()).data.role
+        : '';
+    }
+
+    function roleIs(r) {
+      return userRole() == r;
+    }
+
+    function isAdmin() {
+      return roleIs('administrador');
+    }
+
+    function isGerente() {
+      return roleIs('gerente');
+    }
+
+    function isEstoquista() {
+      return roleIs('estoquista');
+    }
+
+    function isCozinheira() {
+      return roleIs('cozinheira');
+    }
+
+    function isFinanceiro() {
+      return roleIs('financeiro');
+    }
+
+    function isStaff() {
+      return isAdmin() || isGerente();
+    }
+
+    function isOps() {
+      // operações de cantina (estoque/compras/cozinha)
+      return isAdmin() || isGerente() || isEstoquista() || isCozinheira();
+    }
+
+    function isFinanceTeam() {
+      return isAdmin() || isGerente() || isFinanceiro();
+    }
+
+    function isActiveUser() {
+      return userExists() && get(userPath()).data.get('active', true) != false;
+    }
+
+    /* ---------- users ---------- */
+    match /users/{userId} {
+      // Leitura: logado pode listar (telas internas)
+      allow read: if signedIn() && isActiveUser();
+
+      // Criar/editar perfil próprio no login (merge por uid)
+      allow create, update: if signedIn()
+        && (
+          // auto-perfil no próprio uid
+          (userId == request.auth.uid
+            && request.resource.data.email is string
+            && request.resource.data.role is string)
+          // admin gerencia qualquer usuário
+          || isAdmin()
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    /* ---------- estoque e produtos ---------- */
+    match /stock/{id} {
+      allow read: if signedIn() && isActiveUser();
+      allow write: if signedIn() && isActiveUser()
+        && (isOps() || isAdmin());
+    }
+    match /products/{id} {
+      allow read: if signedIn() && isActiveUser();
+      allow write: if signedIn() && isActiveUser()
+        && (isOps() || isAdmin());
+    }
+    match /product_batches/{id} {
+      allow read: if signedIn() && isActiveUser();
+      allow write: if signedIn() && isActiveUser()
+        && (isOps() || isAdmin());
+    }
+    match /stock_movements/{id} {
+      allow read: if signedIn() && isActiveUser()
+        && (isOps() || isFinanceTeam());
+      allow create: if signedIn() && isActiveUser() && isOps();
+      allow update, delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- compras ---------- */
+    match /purchases/{id} {
+      allow read: if signedIn() && isActiveUser()
+        && (isOps() || isFinanceTeam());
+      allow create, update: if signedIn() && isActiveUser()
+        && (isOps() || isFinanceTeam());
+      allow delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- desperdício ---------- */
+    match /waste/{id} {
+      allow read: if signedIn() && isActiveUser()
+        && (isOps() || isStaff() || isFinanceiro());
+      allow create: if signedIn() && isActiveUser()
+        && (isAdmin() || isGerente() || isCozinheira() || isEstoquista());
+      allow update, delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- financeiro ---------- */
+    match /financial_movements/{id} {
+      allow read: if signedIn() && isActiveUser() && isFinanceTeam();
+      allow create, update: if signedIn() && isActiveUser() && isFinanceTeam();
+      allow delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- metas ---------- */
+    match /goals/{id} {
+      allow read: if signedIn() && isActiveUser();
+      allow create, update: if signedIn() && isActiveUser()
+        && (isStaff() || isOps() || isFinanceiro()
+            || roleIs('aluno') || roleIs('professor') || roleIs('funcionario'));
+      allow delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- cozinha / produção ---------- */
+    match /production_logs/{id} {
+      allow read: if signedIn() && isActiveUser() && isOps();
+      allow create: if signedIn() && isActiveUser()
+        && (isAdmin() || isGerente() || isCozinheira());
+      allow update, delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- notificações ---------- */
+    match /notifications/{id} {
+      allow read: if signedIn() && isActiveUser();
+      allow create, update: if signedIn() && isActiveUser()
+        && (isStaff() || isOps() || isFinanceiro());
+      allow delete: if isAdmin() || isGerente();
+    }
+
+    /* ---------- demais coleções do app ---------- */
+    match /{collection}/{id} {
+      allow read: if signedIn() && isActiveUser()
+        && (isAdmin() || isGerente());
+      allow write: if isAdmin();
+    }
+  }
+}
